@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>物品管理</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #2563eb;
+      --primary-light: #dbeafe;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --success: #16a34a;
+      --success-light: #dcfce7;
+      --warning: #d97706;
+      --warning-light: #fef3c7;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --radius: 12px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+
+    /* ヘッダー */
+    .header {
+      background: white;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--gray-200);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .header-sub {
+      font-size: 12px;
+      color: var(--gray-500);
+      margin-top: 2px;
+    }
+
+    /* タブナビ */
+    .tab-nav {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      position: sticky;
+      top: 56px;
+      z-index: 99;
+    }
+    .tab-nav button {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-500);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-nav button.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    /* コンテンツ */
+    .tab-content { display: none; padding: 16px; }
+    .tab-content.active { display: block; }
+
+    /* カード */
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* スキャン画面 */
+    .scan-area {
+      background: white;
+      border-radius: var(--radius);
+      padding: 40px 20px;
+      text-align: center;
+      border: 2px dashed var(--gray-200);
+      margin-bottom: 16px;
+      cursor: pointer;
+    }
+    .scan-area:active { background: var(--gray-100); }
+    .scan-icon { font-size: 48px; margin-bottom: 12px; }
+    .scan-text { font-size: 14px; color: var(--gray-500); }
+
+    /* プレビュー */
+    .preview-img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    /* OCR結果 */
+    .ocr-result { margin-top: 16px; }
+    .ocr-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .ocr-item:last-child { border-bottom: none; }
+    .ocr-item-name { font-size: 14px; font-weight: 500; flex: 1; }
+    .ocr-item-cat {
+      font-size: 11px;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin: 0 8px;
+    }
+    .ocr-item-price { font-size: 14px; font-weight: 600; white-space: nowrap; }
+
+    /* ボタン */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+    .btn:active { opacity: 0.7; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-outline {
+      background: white;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+    .btn-sm { padding: 8px 16px; font-size: 13px; width: auto; }
+
+    /* フォーム */
+    .form-group { margin-bottom: 12px; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--gray-700); }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      -webkit-appearance: none;
+    }
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+
+    /* 検索バー */
+    .search-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .search-bar input { flex: 1; }
+
+    /* 物品リスト */
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .item-info { flex: 1; }
+    .item-name { font-size: 14px; font-weight: 500; }
+    .item-meta { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .item-price { font-size: 14px; font-weight: 600; white-space: nowrap; margin-left: 12px; }
+    .item-actions { display: flex; gap: 6px; margin-left: 8px; }
+
+    /* 発注リスト */
+    .order-row {
+      padding: 12px;
+      border-left: 3px solid var(--gray-200);
+      margin-bottom: 8px;
+      border-radius: 0 8px 8px 0;
+      background: white;
+    }
+    .order-row.urgent { border-left-color: var(--danger); background: var(--danger-light); }
+    .order-header { display: flex; justify-content: space-between; align-items: center; }
+    .order-name { font-size: 14px; font-weight: 600; }
+    .order-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .badge-urgent { background: var(--danger); color: white; }
+    .badge-pending { background: var(--warning-light); color: var(--warning); }
+    .badge-ordered { background: var(--primary-light); color: var(--primary); }
+    .badge-delivered { background: var(--success-light); color: var(--success); }
+    .order-detail { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+
+    /* 発注先サマリー */
+    .supplier-summary {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+    }
+    .supplier-card {
+      min-width: 140px;
+      padding: 12px;
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .supplier-name { font-size: 13px; font-weight: 600; }
+    .supplier-total { font-size: 18px; font-weight: 700; color: var(--primary); margin-top: 4px; }
+    .supplier-count { font-size: 11px; color: var(--gray-500); }
+
+    /* 在庫レベルバッジ */
+    .stock-full { color: var(--success); }
+    .stock-half { color: var(--warning); }
+    .stock-low { color: var(--danger); font-weight: 600; }
+
+    /* 在庫プレースホルダー */
+    .placeholder-section {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--gray-500);
+    }
+    .placeholder-icon { font-size: 48px; margin-bottom: 12px; }
+    .placeholder-text { font-size: 14px; line-height: 1.6; }
+
+    /* ローディング */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--gray-500);
+    }
+    .spinner {
+      display: inline-block;
+      width: 32px; height: 32px;
+      border: 3px solid var(--gray-200);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* モーダル */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      justify-content: center;
+      align-items: flex-end;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 16px 16px 0 0;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 20px;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--gray-500);
+      padding: 4px;
+    }
+
+    /* トースト */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--gray-900);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 300;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .toast.show { opacity: 1; }
+
+    /* フィルターチップ */
+    .filter-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+    .chip {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      border: 1px solid var(--gray-200);
+      background: white;
+      cursor: pointer;
+    }
+    .chip.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>物品管理</h1>
+  <div class="header-sub">眼科クリニック</div>
+</div>
+
+<nav class="tab-nav">
+  <button class="active" onclick="switchTab('scan')">スキャン</button>
+  <button onclick="switchTab('items')">物品一覧</button>
+  <button onclick="switchTab('orders')">発注</button>
+  <button onclick="switchTab('stock')">在庫</button>
+</nav>
+
+<!-- スキャンタブ -->
+<div id="tab-scan" class="tab-content active">
+  <div class="scan-area" onclick="document.getElementById('camera-input').click()">
+    <div class="scan-icon">📷</div>
+    <div class="scan-text">領収書・レシートを撮影<br>タップしてカメラを起動</div>
+  </div>
+  <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="handleImageSelect(event)">
+
+  <div id="scan-preview" style="display:none">
+    <img id="preview-image" class="preview-img">
+    <button class="btn btn-primary" onclick="startOcr()" id="btn-ocr">読み取り開始</button>
+  </div>
+
+  <div id="scan-loading" style="display:none" class="loading">
+    <div class="spinner"></div>
+    <div>読み取り中...</div>
+  </div>
+
+  <div id="scan-result" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <strong>読み取り結果</strong>
+        <span id="result-supplier" style="font-size:13px;color:var(--gray-500)"></span>
+      </div>
+      <div id="result-items" class="ocr-result"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200)">
+        <span style="font-weight:600">合計</span>
+        <span id="result-total" style="font-size:18px;font-weight:700"></span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">発注先（修正可）</label>
+      <input type="text" id="edit-supplier" class="form-input" placeholder="CI、Amazon 等">
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="saveScannedItems()" style="flex:1">データベースに保存</button>
+      <button class="btn btn-outline" onclick="resetScan()" style="flex:1">やり直し</button>
+    </div>
+  </div>
+</div>
+
+<!-- 物品一覧タブ -->
+<div id="tab-items" class="tab-content">
+  <div class="search-bar">
+    <input type="text" class="form-input" id="search-input" placeholder="商品名で検索..." oninput="searchItems()">
+  </div>
+  <div id="category-chips" class="filter-chips"></div>
+  <div id="items-list"></div>
+  <button class="btn btn-outline" onclick="showAddItemModal()" style="margin-top:12px">+ 手動で物品追加</button>
+</div>
+
+<!-- 発注タブ -->
+<div id="tab-orders" class="tab-content">
+  <div id="supplier-summary" class="supplier-summary"></div>
+  <div class="filter-chips" style="margin-bottom:12px">
+    <div class="chip active" onclick="filterOrders('all', this)">すべて</div>
+    <div class="chip" onclick="filterOrders('pending', this)">未発注</div>
+    <div class="chip" onclick="filterOrders('urgent', this)">緊急</div>
+    <div class="chip" onclick="filterOrders('ordered', this)">発注済</div>
+  </div>
+  <div id="orders-list"></div>
+  <button class="btn btn-primary" onclick="showNewOrderModal()" style="margin-top:12px">+ 新規発注依頼</button>
+</div>
+
+<!-- 在庫タブ -->
+<div id="tab-stock" class="tab-content">
+  <div class="placeholder-section">
+    <div class="placeholder-icon">📦</div>
+    <div class="placeholder-text">
+      <strong>在庫管理（準備中）</strong><br><br>
+      今後このタブで在庫レベルの<br>
+      管理ができるようになります。<br><br>
+      ・在庫レベル: 満タン / 半分 / 残少<br>
+      ・残少になったら自動で発注リストへ追加<br>
+      ・物品ごとの消費ペース把握
+    </div>
+  </div>
+</div>
+
+<!-- 物品追加モーダル -->
+<div class="modal-overlay" id="modal-add-item">
+  <div class="modal">
+    <div class="modal-title">
+      物品を追加
+      <button class="modal-close" onclick="closeModal('modal-add-item')">&times;</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">商品名 *</label>
+      <input type="text" class="form-input" id="add-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">分類</label>
+      <select class="form-select" id="add-category">
+        <option value="未分類">未分類</option>
+        <option value="消耗品">消耗品</option>
+        <option value="医療材料">医療材料</option>
+        <option value="事務用品">事務用品</option>
+        <option value="衛生用品">衛生用品</option>
+        <option value="検査用品">検査用品</option>
+        <option value="薬品">薬品</option>
+        <option value="機器">機器</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">発注先</label>
+      <input type="text" class="form-input" id="add-supplier" placeholder="CI、Amazon 等">
+    </div>
+    <div class="form-group">
+      <label class="form-label">単価（円）</label>
+      <input type="number" class="form-input" id="add-price" placeholder="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">メモ</label>
+      <input type="text" class="form-input" id="add-memo" placeholder="">
+    </div>
+    <button class="btn btn-primary" onclick="addItemManual()">追加</button>
+  </div>
+</div>
+
+<!-- 発注依頼モーダル -->
+<div class="modal-overlay" id="modal-new-order">
+  <div class="modal">
+    <div class="modal-title">
+      発注依頼
+      <button class="modal-close" onclick="closeModal('modal-new-order')">&times;</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">商品名 *</label>
+      <input type="text" class="form-input" id="order-item-name" placeholder="商品名を入力">
+      <div id="order-suggestions" style="display:none"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">発注先</label>
+      <input type="text" class="form-input" id="order-supplier" placeholder="CI、Amazon 等">
+    </div>
+    <div class="form-group">
+      <label class="form-label">数量</label>
+      <input type="number" class="form-input" id="order-quantity" value="1" min="1">
+    </div>
+    <div class="form-group">
+      <label class="form-label">単価（円）</label>
+      <input type="number" class="form-input" id="order-price" placeholder="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">緊急度</label>
+      <select class="form-select" id="order-urgency">
+        <option value="normal">通常</option>
+        <option value="urgent">緊急</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">依頼者名</label>
+      <input type="text" class="form-input" id="order-requester" placeholder="">
+    </div>
+    <div class="form-group">
+      <label class="form-label">メモ</label>
+      <input type="text" class="form-input" id="order-memo" placeholder="">
+    </div>
+    <button class="btn btn-primary" onclick="submitOrder()">発注依頼を送信</button>
+  </div>
+</div>
+
+<!-- トースト -->
+<div class="toast" id="toast"></div>
+
+<script>
+// === 設定 ===
+var GAS_URL = "https://script.google.com/macros/s/AKfycbyYye4X62J4D4_fZYlgnGlqGVfGId0Srs2e5-vb9cOUmuIUYiP5zuTHKOKdL4mvPyms/exec";
+
+// === 状態 ===
+var currentTab = "scan";
+var allItems = [];
+var allOrders = [];
+var currentOcrResult = null;
+var selectedCategory = "";
+var orderFilter = "all";
+
+// === タブ切替 ===
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab-nav button").forEach(function(btn) { btn.classList.remove("active"); });
+  document.querySelectorAll(".tab-content").forEach(function(el) { el.classList.remove("active"); });
+  document.querySelector('.tab-nav button[onclick*="' + tab + '"]').classList.add("active");
+  document.getElementById("tab-" + tab).classList.add("active");
+
+  if (tab === "items") loadItems();
+  if (tab === "orders") loadOrders();
+}
+
+// === API呼び出し ===
+function apiGet(action, params) {
+  var url = GAS_URL + "?action=" + action;
+  if (params) {
+    for (var k in params) {
+      if (params[k]) url += "&" + k + "=" + encodeURIComponent(params[k]);
+    }
+  }
+  return fetch(url).then(function(r) { return r.json(); });
+}
+
+function apiPost(body) {
+  return fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); });
+}
+
+// === カメラ/画像処理 ===
+function handleImageSelect(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById("preview-image").src = ev.target.result;
+    document.getElementById("scan-preview").style.display = "block";
+    document.getElementById("scan-result").style.display = "none";
+  };
+  reader.readAsDataURL(file);
+}
+
+function startOcr() {
+  var imgSrc = document.getElementById("preview-image").src;
+  if (!imgSrc) return;
+
+  var base64 = imgSrc.split(",")[1];
+  var mimeMatch = imgSrc.match(/data:([^;]+)/);
+  var mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+
+  document.getElementById("scan-preview").style.display = "none";
+  document.getElementById("scan-loading").style.display = "block";
+
+  apiPost({ action: "scan", imageBase64: base64, mimeType: mimeType })
+    .then(function(data) {
+      document.getElementById("scan-loading").style.display = "none";
+      if (!data.ok) {
+        showToast("読み取りエラー: " + data.error);
+        document.getElementById("scan-preview").style.display = "block";
+        return;
+      }
+
+      currentOcrResult = data.result;
+      renderOcrResult(data.result);
+      document.getElementById("scan-result").style.display = "block";
+    })
+    .catch(function(err) {
+      document.getElementById("scan-loading").style.display = "none";
+      document.getElementById("scan-preview").style.display = "block";
+      showToast("通信エラー");
+    });
+}
+
+function renderOcrResult(result) {
+  document.getElementById("result-supplier").textContent = result.supplier || "";
+  document.getElementById("edit-supplier").value = result.supplier || "";
+  document.getElementById("result-total").textContent = (result.total || 0).toLocaleString() + "円";
+
+  var html = "";
+  (result.items || []).forEach(function(item) {
+    html += '<div class="ocr-item">';
+    html += '<span class="ocr-item-name">' + escapeHtml(item.name) + '</span>';
+    html += '<span class="ocr-item-cat">' + escapeHtml(item.category || "未分類") + '</span>';
+    html += '<span class="ocr-item-price">' + (item.price * (item.quantity || 1)).toLocaleString() + '円</span>';
+    html += '</div>';
+  });
+  document.getElementById("result-items").innerHTML = html;
+}
+
+function saveScannedItems() {
+  if (!currentOcrResult) return;
+
+  var supplier = document.getElementById("edit-supplier").value;
+  var items = currentOcrResult.items || [];
+  var scanMeta = {
+    supplier: supplier,
+    date: currentOcrResult.date,
+    total: currentOcrResult.total
+  };
+
+  apiPost({ action: "saveItems", items: items, scanMeta: scanMeta })
+    .then(function(data) {
+      if (data.ok) {
+        showToast(data.count + "件の物品を保存しました");
+        resetScan();
+      } else {
+        showToast("保存エラー: " + data.error);
+      }
+    })
+    .catch(function() { showToast("通信エラー"); });
+}
+
+function resetScan() {
+  currentOcrResult = null;
+  document.getElementById("scan-preview").style.display = "none";
+  document.getElementById("scan-result").style.display = "none";
+  document.getElementById("scan-loading").style.display = "none";
+  document.getElementById("camera-input").value = "";
+}
+
+// === 物品一覧 ===
+function loadItems() {
+  var params = {};
+  var search = document.getElementById("search-input").value;
+  if (search) params.search = search;
+  if (selectedCategory) params.category = selectedCategory;
+
+  apiGet("items", params).then(function(data) {
+    if (!data.ok) return;
+    allItems = data.items;
+    renderItems(data.items);
+  });
+
+  apiGet("categories").then(function(data) {
+    if (!data.ok) return;
+    renderCategoryChips(data.categories);
+  });
+}
+
+function renderItems(items) {
+  var html = '<div class="card"><div style="font-size:13px;color:var(--gray-500);margin-bottom:8px">' + items.length + '件</div>';
+
+  items.forEach(function(item) {
+    html += '<div class="item-row">';
+    html += '<div class="item-info">';
+    html += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
+    html += '<div class="item-meta">' + escapeHtml(item.category || "") + ' / ' + escapeHtml(item.supplier || "未設定") + '</div>';
+    html += '</div>';
+    if (item.unitPrice > 0) {
+      html += '<span class="item-price">' + item.unitPrice.toLocaleString() + '円</span>';
+    }
+    html += '<div class="item-actions">';
+    html += '<button class="btn btn-sm btn-outline" onclick="orderFromItem(\'' + item.id + '\')">発注</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  html += '</div>';
+  document.getElementById("items-list").innerHTML = html;
+}
+
+function renderCategoryChips(categories) {
+  var html = '<div class="chip ' + (!selectedCategory ? "active" : "") + '" onclick="selectCategory(\'\', this)">すべて</div>';
+  categories.forEach(function(cat) {
+    html += '<div class="chip ' + (selectedCategory === cat.name ? "active" : "") + '" onclick="selectCategory(\'' + escapeHtml(cat.name) + '\', this)">';
+    html += escapeHtml(cat.name) + ' (' + cat.count + ')';
+    html += '</div>';
+  });
+  document.getElementById("category-chips").innerHTML = html;
+}
+
+function selectCategory(cat, el) {
+  selectedCategory = cat;
+  loadItems();
+}
+
+function searchItems() {
+  clearTimeout(window._searchTimer);
+  window._searchTimer = setTimeout(loadItems, 300);
+}
+
+function orderFromItem(itemId) {
+  var item = allItems.find(function(i) { return i.id === itemId; });
+  if (!item) return;
+
+  document.getElementById("order-item-name").value = item.name;
+  document.getElementById("order-supplier").value = item.supplier || "";
+  document.getElementById("order-price").value = item.unitPrice || "";
+  document.getElementById("order-quantity").value = "1";
+  document.getElementById("order-urgency").value = "normal";
+  document.getElementById("order-memo").value = "";
+
+  showModal("modal-new-order");
+}
+
+// === 発注管理 ===
+function loadOrders() {
+  var params = {};
+  if (orderFilter === "pending") params.status = "pending";
+  if (orderFilter === "ordered") params.status = "ordered";
+  if (orderFilter === "urgent") params.urgency = "urgent";
+
+  apiGet("orders", params).then(function(data) {
+    if (!data.ok) return;
+    allOrders = data.orders;
+    renderOrders(data.orders);
+  });
+
+  apiGet("orderSummary").then(function(data) {
+    if (!data.ok) return;
+    renderSupplierSummary(data.summary);
+  });
+}
+
+function renderOrders(orders) {
+  if (orders.length === 0) {
+    document.getElementById("orders-list").innerHTML = '<div class="card" style="text-align:center;color:var(--gray-500)">発注依頼はありません</div>';
+    return;
+  }
+
+  var html = "";
+  orders.forEach(function(order) {
+    var isUrgent = order.urgency === "urgent";
+    html += '<div class="order-row ' + (isUrgent ? "urgent" : "") + '">';
+    html += '<div class="order-header">';
+    html += '<span class="order-name">' + escapeHtml(order.itemName) + '</span>';
+    html += '<span class="order-badge badge-' + order.status + '">' + statusLabel(order.status) + '</span>';
+    html += '</div>';
+    html += '<div class="order-detail">';
+    html += escapeHtml(order.supplier || "未設定") + ' / ' + order.quantity + '個';
+    if (order.totalPrice > 0) html += ' / ' + order.totalPrice.toLocaleString() + '円';
+    if (isUrgent) html += ' / <span style="color:var(--danger);font-weight:600">緊急</span>';
+    html += '</div>';
+
+    if (order.status === "pending") {
+      html += '<div style="margin-top:8px;display:flex;gap:6px">';
+      html += '<button class="btn btn-sm btn-success" onclick="markOrdered(\'' + order.id + '\')">発注済にする</button>';
+      if (!isUrgent) {
+        html += '<button class="btn btn-sm btn-danger" onclick="markUrgent(\'' + order.id + '\')">緊急に変更</button>';
+      }
+      html += '</div>';
+    } else if (order.status === "ordered") {
+      html += '<div style="margin-top:8px">';
+      html += '<button class="btn btn-sm btn-success" onclick="markDelivered(\'' + order.id + '\')">納品済にする</button>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+  });
+
+  document.getElementById("orders-list").innerHTML = html;
+}
+
+function renderSupplierSummary(summary) {
+  if (!summary || summary.length === 0) {
+    document.getElementById("supplier-summary").innerHTML = "";
+    return;
+  }
+
+  var html = "";
+  summary.forEach(function(s) {
+    html += '<div class="supplier-card">';
+    html += '<div class="supplier-name">' + escapeHtml(s.supplier) + '</div>';
+    html += '<div class="supplier-total">' + s.totalAmount.toLocaleString() + '円</div>';
+    html += '<div class="supplier-count">' + s.itemCount + '件';
+    if (s.urgentCount > 0) html += ' (緊急' + s.urgentCount + ')';
+    html += '</div>';
+
+    if (s.supplier === "CI") {
+      if (s.totalAmount >= 7000) {
+        html += '<div style="font-size:11px;color:var(--success);margin-top:4px">送料無料OK</div>';
+      } else {
+        html += '<div style="font-size:11px;color:var(--warning);margin-top:4px">あと' + (7000 - s.totalAmount).toLocaleString() + '円で送料無料</div>';
+      }
+    }
+
+    html += '</div>';
+  });
+
+  document.getElementById("supplier-summary").innerHTML = html;
+}
+
+function filterOrders(filter, el) {
+  orderFilter = filter;
+  document.querySelectorAll("#tab-orders .chip").forEach(function(c) { c.classList.remove("active"); });
+  if (el) el.classList.add("active");
+  loadOrders();
+}
+
+function statusLabel(status) {
+  var labels = { pending: "未発注", ordered: "発注済", delivered: "納品済", cancelled: "キャンセル" };
+  return labels[status] || status;
+}
+
+function markOrdered(id) {
+  apiPost({ action: "updateOrderStatus", orderId: id, status: "ordered" })
+    .then(function(data) {
+      if (data.ok) { showToast("発注済に更新"); loadOrders(); }
+      else showToast("エラー: " + data.error);
+    });
+}
+
+function markDelivered(id) {
+  apiPost({ action: "updateOrderStatus", orderId: id, status: "delivered" })
+    .then(function(data) {
+      if (data.ok) { showToast("納品済に更新"); loadOrders(); }
+      else showToast("エラー: " + data.error);
+    });
+}
+
+function markUrgent(id) {
+  apiPost({ action: "urgentOrder", orderId: id })
+    .then(function(data) {
+      if (data.ok) { showToast("緊急に変更 / LINE通知を送信しました"); loadOrders(); }
+      else showToast("エラー: " + data.error);
+    });
+}
+
+function submitOrder() {
+  var order = {
+    itemName: document.getElementById("order-item-name").value,
+    supplier: document.getElementById("order-supplier").value,
+    quantity: Number(document.getElementById("order-quantity").value) || 1,
+    unitPrice: Number(document.getElementById("order-price").value) || 0,
+    urgency: document.getElementById("order-urgency").value,
+    requestedBy: document.getElementById("order-requester").value,
+    memo: document.getElementById("order-memo").value
+  };
+
+  if (!order.itemName) {
+    showToast("商品名を入力してください");
+    return;
+  }
+
+  apiPost({ action: "createOrder", order: order })
+    .then(function(data) {
+      if (data.ok) {
+        showToast("発注依頼を登録しました");
+        closeModal("modal-new-order");
+        loadOrders();
+      } else {
+        showToast("エラー: " + data.error);
+      }
+    })
+    .catch(function() { showToast("通信エラー"); });
+}
+
+// === 手動物品追加 ===
+function showAddItemModal() {
+  document.getElementById("add-name").value = "";
+  document.getElementById("add-category").value = "未分類";
+  document.getElementById("add-supplier").value = "";
+  document.getElementById("add-price").value = "";
+  document.getElementById("add-memo").value = "";
+  showModal("modal-add-item");
+}
+
+function addItemManual() {
+  var item = {
+    name: document.getElementById("add-name").value,
+    category: document.getElementById("add-category").value,
+    supplier: document.getElementById("add-supplier").value,
+    unitPrice: Number(document.getElementById("add-price").value) || 0,
+    memo: document.getElementById("add-memo").value
+  };
+
+  if (!item.name) {
+    showToast("商品名を入力してください");
+    return;
+  }
+
+  apiPost({ action: "addItem", item: item })
+    .then(function(data) {
+      if (data.ok) {
+        showToast("物品を追加しました");
+        closeModal("modal-add-item");
+        loadItems();
+      } else {
+        showToast("エラー: " + data.error);
+      }
+    })
+    .catch(function() { showToast("通信エラー"); });
+}
+
+function showNewOrderModal() {
+  document.getElementById("order-item-name").value = "";
+  document.getElementById("order-supplier").value = "";
+  document.getElementById("order-quantity").value = "1";
+  document.getElementById("order-price").value = "";
+  document.getElementById("order-urgency").value = "normal";
+  document.getElementById("order-requester").value = "";
+  document.getElementById("order-memo").value = "";
+  showModal("modal-new-order");
+}
+
+// === モーダル ===
+function showModal(id) {
+  document.getElementById(id).classList.add("show");
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove("show");
+}
+
+// === トースト ===
+function showToast(msg) {
+  var el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function() { el.classList.remove("show"); }, 3000);
+}
+
+// === ユーティリティ ===
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// モーダル外タップで閉じる
+document.querySelectorAll(".modal-overlay").forEach(function(overlay) {
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) overlay.classList.remove("show");
+  });
+});
+</script>
+
+</body>
+</html>
