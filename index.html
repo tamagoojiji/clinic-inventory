@@ -658,10 +658,19 @@ function renderOcrResult(result) {
 
   var html = "";
   (result.items || []).forEach(function(item) {
-    html += '<div class="ocr-item">';
+    var unitPrice = item.unitPrice || item.price || 0;
+    var qty = item.quantity || 1;
+    var unit = item.unit || "個";
+    var subtotal = item.subtotal || (unitPrice * qty);
+    html += '<div class="ocr-item" style="flex-wrap:wrap">';
+    html += '<div style="width:100%;display:flex;justify-content:space-between;align-items:center">';
     html += '<span class="ocr-item-name">' + escapeHtml(item.name) + '</span>';
     html += '<span class="ocr-item-cat">' + escapeHtml(item.category || "未分類") + '</span>';
-    html += '<span class="ocr-item-price">' + (item.price * (item.quantity || 1)).toLocaleString() + '円</span>';
+    html += '</div>';
+    html += '<div style="width:100%;display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-top:4px">';
+    html += '<span>@' + unitPrice.toLocaleString() + '円 x ' + qty + unit + '</span>';
+    html += '<span style="font-size:14px;font-weight:600;color:var(--gray-900)">' + subtotal.toLocaleString() + '円</span>';
+    html += '</div>';
     html += '</div>';
   });
   document.getElementById("result-items").innerHTML = html;
