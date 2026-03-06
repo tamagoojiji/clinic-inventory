@@ -571,13 +571,14 @@ function apiGet(action, params) {
       if (params[k]) url += "&" + k + "=" + encodeURIComponent(params[k]);
     }
   }
-  return fetch(url).then(function(r) { return r.json(); });
+  return fetch(url, { redirect: "follow" }).then(function(r) { return r.json(); });
 }
 
 function apiPost(body) {
   return fetch(GAS_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    redirect: "follow",
+    headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(body)
   }).then(function(r) { return r.json(); });
 }
