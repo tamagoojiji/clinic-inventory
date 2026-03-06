@@ -577,10 +577,12 @@ function apiGet(action, params) {
 function apiPost(body) {
   return fetch(GAS_URL, {
     method: "POST",
-    redirect: "follow",
-    headers: { "Content-Type": "text/plain" },
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(body)
-  }).then(function(r) { return r.json(); });
+  }).then(function(r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  });
 }
 
 // === カメラ/画像処理 ===
@@ -597,18 +599,39 @@ function handleImageSelect(e) {
   reader.readAsDataURL(file);
 }
 
+function resizeImage(dataUrl, maxWidth) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width;
+      var h = img.height;
+      if (w > maxWidth) {
+        h = Math.round(h * maxWidth / w);
+        w = maxWidth;
+      }
+      var canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.8));
+    };
+    img.src = dataUrl;
+  });
+}
+
 function startOcr() {
   var imgSrc = document.getElementById("preview-image").src;
   if (!imgSrc) return;
 
-  var base64 = imgSrc.split(",")[1];
-  var mimeMatch = imgSrc.match(/data:([^;]+)/);
-  var mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
-
   document.getElementById("scan-preview").style.display = "none";
   document.getElementById("scan-loading").style.display = "block";
 
-  apiPost({ action: "scan", imageBase64: base64, mimeType: mimeType })
+  resizeImage(imgSrc, 1200).then(function(resized) {
+    var base64 = resized.split(",")[1];
+    var mimeType = "image/jpeg";
+
+    return apiPost({ action: "scan", imageBase64: base64, mimeType: mimeType });
+  })
     .then(function(data) {
       document.getElementById("scan-loading").style.display = "none";
       if (!data.ok) {
@@ -624,7 +647,7 @@ function startOcr() {
     .catch(function(err) {
       document.getElementById("scan-loading").style.display = "none";
       document.getElementById("scan-preview").style.display = "block";
-      showToast("通信エラー");
+      showToast("通信エラー: " + (err.message || err));
     });
 }
 
