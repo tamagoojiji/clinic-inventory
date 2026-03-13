@@ -514,7 +514,7 @@
     </div>
     <div class="form-group">
       <label class="form-label">商品名 *</label>
-      <input type="text" class="form-input" id="order-item-name" placeholder="商品名の一部を入力..." autocomplete="off" oninput="searchOrderItems()">
+      <input type="text" class="form-input" id="order-item-name" placeholder="商品名の一部を入力..." autocomplete="off">
       <div id="order-suggestions" style="display:none;max-height:200px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;margin-top:4px;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
     </div>
     <div class="form-group">
@@ -1112,7 +1112,23 @@ function showNewOrderModal() {
   showModal("modal-new-order");
 }
 
-// === 発注モーダル：商品名サジェスト ===
+// === 発注モーダル：商品名サジェスト（IME対応） ===
+var _isComposing = false;
+var _searchTimer = null;
+(function() {
+  var el = document.getElementById("order-item-name");
+  el.addEventListener("compositionstart", function() { _isComposing = true; });
+  el.addEventListener("compositionend", function() {
+    _isComposing = false;
+    searchOrderItems();
+  });
+  el.addEventListener("input", function() {
+    if (_isComposing) return;
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(searchOrderItems, 150);
+  });
+})();
+
 function searchOrderItems() {
   var q = document.getElementById("order-item-name").value.trim().toLowerCase();
   var sugBox = document.getElementById("order-suggestions");
