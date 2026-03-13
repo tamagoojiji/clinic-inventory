@@ -1110,21 +1110,18 @@ function showNewOrderModal() {
   showModal("modal-new-order");
 }
 
-// === 発注モーダル：商品名サジェスト（IME対応） ===
-var _isComposing = false;
-var _searchTimer = null;
+// === 発注モーダル：商品名サジェスト ===
+var _orderSearchTimer = null;
 (function() {
   var el = document.getElementById("order-item-name");
-  el.addEventListener("compositionstart", function() { _isComposing = true; });
-  el.addEventListener("compositionend", function() {
-    _isComposing = false;
-    searchOrderItems();
-  });
-  el.addEventListener("input", function() {
-    if (_isComposing) return;
-    clearTimeout(_searchTimer);
-    _searchTimer = setTimeout(searchOrderItems, 150);
-  });
+  // input + keyup + compositionend 全てで発火（iOS Safari対応）
+  function triggerSearch() {
+    clearTimeout(_orderSearchTimer);
+    _orderSearchTimer = setTimeout(searchOrderItems, 300);
+  }
+  el.addEventListener("input", triggerSearch);
+  el.addEventListener("keyup", triggerSearch);
+  el.addEventListener("compositionend", triggerSearch);
 })();
 
 function searchOrderItems() {
