@@ -690,7 +690,11 @@ function saveScannedItems() {
   apiPost({ action: "saveItems", items: items, scanMeta: scanMeta })
     .then(function(data) {
       if (data.ok) {
-        showToast(data.count + "件の物品を保存しました");
+        var msg = "";
+        if (data.newCount > 0) msg += "新規" + data.newCount + "件";
+        if (data.updatedCount > 0) msg += (msg ? "・" : "") + "更新" + data.updatedCount + "件";
+        if (!msg) msg = data.count + "件保存";
+        showToast(msg);
         resetScan();
       } else {
         showToast("保存エラー: " + data.error);
