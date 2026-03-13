@@ -1103,12 +1103,10 @@ function showNewOrderModal() {
   document.getElementById("order-requester").value = "";
   document.getElementById("order-memo").value = "";
   document.getElementById("order-suggestions").style.display = "none";
-  // 物品一覧を事前に取得
-  if (allItems.length === 0) {
-    apiGet("items").then(function(data) {
-      if (data.ok) allItems = data.items;
-    });
-  }
+  // 物品一覧を毎回取得（最新データで検索するため）
+  apiGet("items").then(function(data) {
+    if (data.ok) allItems = data.items;
+  });
   showModal("modal-new-order");
 }
 
@@ -1199,6 +1197,11 @@ function escapeHtml(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+
+// 起動時に物品一覧を取得
+apiGet("items").then(function(data) {
+  if (data.ok) allItems = data.items;
+});
 
 // モーダル外タップで閉じる
 document.querySelectorAll(".modal-overlay").forEach(function(overlay) {
