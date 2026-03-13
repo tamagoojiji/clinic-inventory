@@ -514,7 +514,10 @@
     </div>
     <div class="form-group">
       <label class="form-label">商品名 *</label>
-      <input type="text" class="form-input" id="order-item-name" placeholder="商品名の一部を入力..." autocomplete="off">
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" id="order-item-name" placeholder="商品名の一部を入力..." autocomplete="off" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="searchOrderItems()" style="white-space:nowrap;width:auto;padding:10px 16px">検索</button>
+      </div>
       <div id="order-suggestions" style="display:none;max-height:200px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;margin-top:4px;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
     </div>
     <div class="form-group">
@@ -1111,19 +1114,6 @@ function showNewOrderModal() {
 }
 
 // === 発注モーダル：商品名サジェスト ===
-var _orderSearchTimer = null;
-(function() {
-  var el = document.getElementById("order-item-name");
-  // input + keyup + compositionend 全てで発火（iOS Safari対応）
-  function triggerSearch() {
-    clearTimeout(_orderSearchTimer);
-    _orderSearchTimer = setTimeout(searchOrderItems, 300);
-  }
-  el.addEventListener("input", triggerSearch);
-  el.addEventListener("keyup", triggerSearch);
-  el.addEventListener("compositionend", triggerSearch);
-})();
-
 function searchOrderItems() {
   var q = document.getElementById("order-item-name").value.trim().toLowerCase();
   var sugBox = document.getElementById("order-suggestions");
@@ -1133,32 +1123,36 @@ function searchOrderItems() {
     return;
   }
 
-  var matches = allItems.filter(function(item) {
-    return item.name.toLowerCase().indexOf(q) !== -1 ||
-           (item.modelNumber && item.modelNumber.toLowerCase().indexOf(q) !== -1) ||
-           (item.category && item.category.toLowerCase().indexOf(q) !== -1);
-  }).slice(0, 10);
-
-  if (matches.length === 0) {
-    sugBox.style.display = "none";
-    return;
-  }
-
-  var html = "";
-  matches.forEach(function(item) {
-    html += '<div onclick="selectOrderItem(\'' + escapeHtml(item.id) + '\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:14px">';
-    html += '<div style="font-weight:500">' + escapeHtml(item.name);
-    if (item.modelNumber) html += ' <span style="font-size:11px;color:var(--gray-500)">(' + escapeHtml(item.modelNumber) + ')</span>';
-    html += '</div>';
-    html += '<div style="font-size:12px;color:var(--gray-500);margin-top:2px">';
-    html += escapeHtml(item.category || "") + ' / ' + escapeHtml(item.supplier || "未設定");
-    if (item.unitPrice > 0) html += ' / ' + item.unitPrice.toLocaleString() + '円';
-    html += '</div>';
-    html += '</div>';
-  });
-
-  sugBox.innerHTML = html;
+  sugBox.innerHTML = '<div style="padding:10px 12px;font-size:13px;color:var(--gray-500)">検索中...</div>';
   sugBox.style.display = "block";
+
+  // APIから毎回取得して検索（キャッシュ問題を回避）
+  apiGet("items", { search: q }).then(function(data) {
+    if (!data.ok || !data.items || data.items.length === 0) {
+      sugBox.innerHTML = '<div style="padding:10px 12px;font-size:13px;color:var(--gray-500)">該当なし</div>';
+      return;
+    }
+
+    allItems = data.items.length > allItems.length ? data.items : allItems;
+    var matches = data.items.slice(0, 10);
+
+    var html = "";
+    matches.forEach(function(item) {
+      html += '<div onclick="selectOrderItem(\'' + escapeHtml(item.id) + '\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:14px">';
+      html += '<div style="font-weight:500">' + escapeHtml(item.name);
+      if (item.modelNumber) html += ' <span style="font-size:11px;color:var(--gray-500)">(' + escapeHtml(item.modelNumber) + ')</span>';
+      html += '</div>';
+      html += '<div style="font-size:12px;color:var(--gray-500);margin-top:2px">';
+      html += escapeHtml(item.category || "") + ' / ' + escapeHtml(item.supplier || "未設定");
+      if (item.unitPrice > 0) html += ' / ' + item.unitPrice.toLocaleString() + '円';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    sugBox.innerHTML = html;
+  }).catch(function() {
+    sugBox.innerHTML = '<div style="padding:10px 12px;font-size:13px;color:var(--danger)">通信エラー</div>';
+  });
 }
 
 function selectOrderItem(itemId) {
