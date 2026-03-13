@@ -377,16 +377,28 @@
     <div class="scan-icon">📷</div>
     <div class="scan-text">領収書・レシートを撮影<br>タップしてカメラを起動</div>
   </div>
+  <div class="scan-area" onclick="document.getElementById('library-input').click()" style="padding:20px;border-style:solid;border-color:var(--primary);background:var(--primary-light)">
+    <div class="scan-icon" style="font-size:32px">🖼️</div>
+    <div class="scan-text">ライブラリから選択（最大5枚）</div>
+  </div>
   <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="handleImageSelect(event)">
+  <input type="file" id="library-input" accept="image/*" multiple style="display:none" onchange="handleMultiImageSelect(event)">
 
   <div id="scan-preview" style="display:none">
     <img id="preview-image" class="preview-img">
     <button class="btn btn-primary" onclick="startOcr()" id="btn-ocr">読み取り開始</button>
   </div>
 
+  <!-- 複数枚プレビュー -->
+  <div id="multi-preview" style="display:none">
+    <div id="multi-thumbnails" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px"></div>
+    <div style="font-size:13px;color:var(--gray-500);margin-bottom:8px"><span id="multi-count"></span>枚選択中</div>
+    <button class="btn btn-primary" onclick="startMultiOcr()">まとめて読み取り開始</button>
+  </div>
+
   <div id="scan-loading" style="display:none" class="loading">
     <div class="spinner"></div>
-    <div>読み取り中...</div>
+    <div id="scan-loading-text">読み取り中...</div>
   </div>
 
   <div id="scan-result" style="display:none">
@@ -548,6 +560,7 @@ var currentTab = "scan";
 var allItems = [];
 var allOrders = [];
 var currentOcrResult = null;
+var multiImageDataUrls = [];
 var selectedCategory = "";
 var orderFilter = "all";
 
@@ -703,12 +716,118 @@ function saveScannedItems() {
     .catch(function() { showToast("通信エラー"); });
 }
 
+// === 複数枚ライブラリ選択 ===
+function handleMultiImageSelect(e) {
+  var files = Array.from(e.target.files);
+  if (files.length === 0) return;
+  if (files.length > 5) {
+    showToast("最大5枚まで選択できます");
+    files = files.slice(0, 5);
+  }
+
+  multiImageDataUrls = [];
+  var thumbHtml = "";
+  var loaded = 0;
+
+  files.forEach(function(file, idx) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      multiImageDataUrls[idx] = ev.target.result;
+      loaded++;
+      if (loaded === files.length) {
+        // サムネイル表示
+        var html = "";
+        for (var t = 0; t < multiImageDataUrls.length; t++) {
+          html += '<img src="' + multiImageDataUrls[t] + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--gray-200)">';
+        }
+        document.getElementById("multi-thumbnails").innerHTML = html;
+        document.getElementById("multi-count").textContent = multiImageDataUrls.length;
+        document.getElementById("multi-preview").style.display = "block";
+        document.getElementById("scan-preview").style.display = "none";
+        document.getElementById("scan-result").style.display = "none";
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function startMultiOcr() {
+  if (multiImageDataUrls.length === 0) return;
+
+  document.getElementById("multi-preview").style.display = "none";
+  document.getElementById("scan-loading").style.display = "block";
+
+  var allItems = [];
+  var allSuppliers = [];
+  var allDates = [];
+  var totalSum = 0;
+  var processed = 0;
+  var total = multiImageDataUrls.length;
+  var errors = [];
+
+  function processNext(idx) {
+    if (idx >= total) {
+      // 全枚完了
+      document.getElementById("scan-loading").style.display = "none";
+
+      if (allItems.length === 0) {
+        showToast("読み取れた商品がありません" + (errors.length > 0 ? "（" + errors.length + "枚エラー）" : ""));
+        document.getElementById("multi-preview").style.display = "block";
+        return;
+      }
+
+      // 結果を統合
+      var supplier = allSuppliers.filter(function(s) { return s; })[0] || "";
+      var date = allDates.filter(function(d) { return d; })[0] || "";
+      currentOcrResult = {
+        items: allItems,
+        supplier: supplier,
+        date: date,
+        total: totalSum
+      };
+      renderOcrResult(currentOcrResult);
+      document.getElementById("scan-result").style.display = "block";
+      if (errors.length > 0) {
+        showToast(total + "枚中" + (total - errors.length) + "枚読み取り完了（" + errors.length + "枚エラー）");
+      }
+      return;
+    }
+
+    document.getElementById("scan-loading-text").textContent = "読み取り中... (" + (idx + 1) + "/" + total + ")";
+
+    resizeImage(multiImageDataUrls[idx], 1200).then(function(resized) {
+      var base64 = resized.split(",")[1];
+      return apiPost({ action: "scan", imageBase64: base64, mimeType: "image/jpeg" });
+    }).then(function(data) {
+      if (data.ok && data.result) {
+        var r = data.result;
+        allItems = allItems.concat(r.items || []);
+        allSuppliers.push(r.supplier);
+        allDates.push(r.date);
+        totalSum += Number(r.total) || 0;
+      } else {
+        errors.push(idx + 1);
+      }
+      processNext(idx + 1);
+    }).catch(function() {
+      errors.push(idx + 1);
+      processNext(idx + 1);
+    });
+  }
+
+  processNext(0);
+}
+
 function resetScan() {
   currentOcrResult = null;
+  multiImageDataUrls = [];
   document.getElementById("scan-preview").style.display = "none";
+  document.getElementById("multi-preview").style.display = "none";
   document.getElementById("scan-result").style.display = "none";
   document.getElementById("scan-loading").style.display = "none";
+  document.getElementById("scan-loading-text").textContent = "読み取り中...";
   document.getElementById("camera-input").value = "";
+  document.getElementById("library-input").value = "";
 }
 
 // === 物品一覧 ===
