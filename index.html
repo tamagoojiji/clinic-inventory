@@ -514,8 +514,8 @@
     </div>
     <div class="form-group">
       <label class="form-label">商品名 *</label>
-      <input type="text" class="form-input" id="order-item-name" placeholder="商品名を入力">
-      <div id="order-suggestions" style="display:none"></div>
+      <input type="text" class="form-input" id="order-item-name" placeholder="商品名の一部を入力..." autocomplete="off" oninput="searchOrderItems()">
+      <div id="order-suggestions" style="display:none;max-height:200px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;margin-top:4px;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
     </div>
     <div class="form-group">
       <label class="form-label">発注先</label>
@@ -1102,7 +1102,62 @@ function showNewOrderModal() {
   document.getElementById("order-urgency").value = "normal";
   document.getElementById("order-requester").value = "";
   document.getElementById("order-memo").value = "";
+  document.getElementById("order-suggestions").style.display = "none";
+  // 物品一覧を事前に取得
+  if (allItems.length === 0) {
+    apiGet("items").then(function(data) {
+      if (data.ok) allItems = data.items;
+    });
+  }
   showModal("modal-new-order");
+}
+
+// === 発注モーダル：商品名サジェスト ===
+function searchOrderItems() {
+  var q = document.getElementById("order-item-name").value.trim().toLowerCase();
+  var sugBox = document.getElementById("order-suggestions");
+
+  if (q.length === 0) {
+    sugBox.style.display = "none";
+    return;
+  }
+
+  var matches = allItems.filter(function(item) {
+    return item.name.toLowerCase().indexOf(q) !== -1 ||
+           (item.modelNumber && item.modelNumber.toLowerCase().indexOf(q) !== -1) ||
+           (item.category && item.category.toLowerCase().indexOf(q) !== -1);
+  }).slice(0, 10);
+
+  if (matches.length === 0) {
+    sugBox.style.display = "none";
+    return;
+  }
+
+  var html = "";
+  matches.forEach(function(item) {
+    html += '<div onclick="selectOrderItem(\'' + escapeHtml(item.id) + '\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:14px">';
+    html += '<div style="font-weight:500">' + escapeHtml(item.name);
+    if (item.modelNumber) html += ' <span style="font-size:11px;color:var(--gray-500)">(' + escapeHtml(item.modelNumber) + ')</span>';
+    html += '</div>';
+    html += '<div style="font-size:12px;color:var(--gray-500);margin-top:2px">';
+    html += escapeHtml(item.category || "") + ' / ' + escapeHtml(item.supplier || "未設定");
+    if (item.unitPrice > 0) html += ' / ' + item.unitPrice.toLocaleString() + '円';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  sugBox.innerHTML = html;
+  sugBox.style.display = "block";
+}
+
+function selectOrderItem(itemId) {
+  var item = allItems.find(function(i) { return i.id === itemId; });
+  if (!item) return;
+
+  document.getElementById("order-item-name").value = item.name;
+  document.getElementById("order-supplier").value = item.supplier || "";
+  document.getElementById("order-price").value = item.unitPrice || "";
+  document.getElementById("order-suggestions").style.display = "none";
 }
 
 // === モーダル ===
