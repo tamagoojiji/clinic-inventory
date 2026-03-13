@@ -736,7 +736,7 @@ function renderItems(items) {
   items.forEach(function(item) {
     html += '<div class="item-row">';
     html += '<div class="item-info">';
-    html += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
+    html += '<div class="item-name">' + escapeHtml(item.name) + (item.modelNumber ? ' <span style="font-size:11px;color:var(--gray-500)">(' + escapeHtml(item.modelNumber) + ')</span>' : '') + '</div>';
     html += '<div class="item-meta">' + escapeHtml(item.category || "") + ' / ' + escapeHtml(item.supplier || "未設定") + '</div>';
     html += '</div>';
     if (item.unitPrice > 0) {
