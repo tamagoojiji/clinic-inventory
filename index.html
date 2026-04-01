@@ -355,6 +355,45 @@
       color: white;
       border-color: var(--primary);
     }
+
+    /* OCR編集モード */
+    .ocr-item-wrap { position: relative; }
+    .ocr-edit-btn {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px;
+      color: var(--gray-500);
+      flex-shrink: 0;
+    }
+    .ocr-edit-form {
+      background: var(--gray-50);
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 4px 0;
+    }
+    .ocr-edit-form .form-group { margin-bottom: 8px; }
+    .ocr-edit-form .form-label { font-size: 11px; margin-bottom: 2px; }
+    .ocr-edit-form .form-input,
+    .ocr-edit-form .form-select { padding: 8px 10px; font-size: 13px; }
+    .ocr-edit-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .ocr-edit-row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 80px;
+      gap: 8px;
+    }
+    .ocr-edit-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .ocr-edit-actions button { flex: 1; padding: 8px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -667,29 +706,118 @@ function startOcr() {
     });
 }
 
+var CATEGORY_OPTIONS = ["消耗品","医療材料","事務用品","薬品","検査用品","機器","衛生用品","その他"];
+
 function renderOcrResult(result) {
   document.getElementById("result-supplier").textContent = result.supplier || "";
   document.getElementById("edit-supplier").value = result.supplier || "";
-  document.getElementById("result-total").textContent = (result.total || 0).toLocaleString() + "円";
+  recalcOcrTotal();
 
   var html = "";
-  (result.items || []).forEach(function(item) {
+  (result.items || []).forEach(function(item, idx) {
     var unitPrice = item.unitPrice || item.price || 0;
     var qty = item.quantity || 1;
     var unit = item.unit || "個";
     var subtotal = item.subtotal || (unitPrice * qty);
-    html += '<div class="ocr-item" style="flex-wrap:wrap">';
-    html += '<div style="width:100%;display:flex;justify-content:space-between;align-items:center">';
+    // 通常表示
+    html += '<div class="ocr-item-wrap" id="ocr-row-' + idx + '">';
+    html += '<div class="ocr-item" style="flex-wrap:wrap;cursor:pointer" onclick="toggleOcrItemEdit(' + idx + ')">';
+    html += '<div style="width:calc(100% - 32px);display:flex;justify-content:space-between;align-items:center">';
     html += '<span class="ocr-item-name">' + escapeHtml(item.name) + (item.modelNumber ? ' <span style="font-size:11px;color:var(--gray-500)">(' + escapeHtml(item.modelNumber) + ')</span>' : '') + '</span>';
     html += '<span class="ocr-item-cat">' + escapeHtml(item.category || "未分類") + '</span>';
     html += '</div>';
+    html += '<button class="ocr-edit-btn" onclick="event.stopPropagation();toggleOcrItemEdit(' + idx + ')">✏️</button>';
     html += '<div style="width:100%;display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-top:4px">';
     html += '<span>@' + unitPrice.toLocaleString() + '円 x ' + qty + unit + '</span>';
     html += '<span style="font-size:14px;font-weight:600;color:var(--gray-900)">' + subtotal.toLocaleString() + '円</span>';
     html += '</div>';
     html += '</div>';
+    html += '</div>';
   });
   document.getElementById("result-items").innerHTML = html;
+}
+
+function toggleOcrItemEdit(idx) {
+  var wrap = document.getElementById("ocr-row-" + idx);
+  if (!wrap || !currentOcrResult) return;
+  // 既に編集フォームがあれば閉じる
+  if (wrap.querySelector(".ocr-edit-form")) {
+    renderOcrResult(currentOcrResult);
+    return;
+  }
+  var item = currentOcrResult.items[idx];
+  if (!item) return;
+
+  var unitPrice = item.unitPrice || item.price || 0;
+  var qty = item.quantity || 1;
+  var unit = item.unit || "個";
+  var cat = item.category || "未分類";
+
+  var catOpts = "";
+  CATEGORY_OPTIONS.forEach(function(c) {
+    catOpts += '<option value="' + c + '"' + (c === cat ? ' selected' : '') + '>' + c + '</option>';
+  });
+
+  var form = '<div class="ocr-edit-form" onclick="event.stopPropagation()">';
+  form += '<div class="form-group"><label class="form-label">商品名</label>';
+  form += '<input type="text" class="form-input" id="ocr-edit-name-' + idx + '" value="' + escapeHtml(item.name || '') + '"></div>';
+  form += '<div class="ocr-edit-row">';
+  form += '<div class="form-group"><label class="form-label">規格番号</label>';
+  form += '<input type="text" class="form-input" id="ocr-edit-model-' + idx + '" value="' + escapeHtml(item.modelNumber || '') + '"></div>';
+  form += '<div class="form-group"><label class="form-label">カテゴリ</label>';
+  form += '<select class="form-select" id="ocr-edit-cat-' + idx + '">' + catOpts + '</select></div>';
+  form += '</div>';
+  form += '<div class="ocr-edit-row-3">';
+  form += '<div class="form-group"><label class="form-label">単価（円）</label>';
+  form += '<input type="number" class="form-input" id="ocr-edit-price-' + idx + '" value="' + unitPrice + '"></div>';
+  form += '<div class="form-group"><label class="form-label">数量</label>';
+  form += '<input type="number" class="form-input" id="ocr-edit-qty-' + idx + '" value="' + qty + '" min="1"></div>';
+  form += '<div class="form-group"><label class="form-label">単位</label>';
+  form += '<input type="text" class="form-input" id="ocr-edit-unit-' + idx + '" value="' + escapeHtml(unit) + '"></div>';
+  form += '</div>';
+  form += '<div class="ocr-edit-actions">';
+  form += '<button class="btn btn-primary" onclick="confirmOcrItemEdit(' + idx + ')">✅ 確定</button>';
+  form += '<button class="btn btn-danger" onclick="deleteOcrItem(' + idx + ')">🗑 削除</button>';
+  form += '</div>';
+  form += '</div>';
+
+  wrap.innerHTML += form;
+}
+
+function confirmOcrItemEdit(idx) {
+  if (!currentOcrResult || !currentOcrResult.items[idx]) return;
+  var item = currentOcrResult.items[idx];
+  item.name = document.getElementById("ocr-edit-name-" + idx).value;
+  item.modelNumber = document.getElementById("ocr-edit-model-" + idx).value;
+  item.category = document.getElementById("ocr-edit-cat-" + idx).value;
+  item.unitPrice = Number(document.getElementById("ocr-edit-price-" + idx).value) || 0;
+  item.price = item.unitPrice;
+  item.quantity = Number(document.getElementById("ocr-edit-qty-" + idx).value) || 1;
+  item.unit = document.getElementById("ocr-edit-unit-" + idx).value || "個";
+  item.subtotal = item.unitPrice * item.quantity;
+  recalcOcrTotal();
+  renderOcrResult(currentOcrResult);
+}
+
+function deleteOcrItem(idx) {
+  if (!currentOcrResult) return;
+  currentOcrResult.items.splice(idx, 1);
+  recalcOcrTotal();
+  renderOcrResult(currentOcrResult);
+  showToast("商品を削除しました");
+}
+
+function recalcOcrTotal() {
+  if (!currentOcrResult) return;
+  var total = 0;
+  (currentOcrResult.items || []).forEach(function(item) {
+    var up = item.unitPrice || item.price || 0;
+    var qty = item.quantity || 1;
+    item.subtotal = up * qty;
+    total += item.subtotal;
+  });
+  currentOcrResult.total = total;
+  document.getElementById("result-total").textContent = total.toLocaleString() + "円";
 }
 
 function saveScannedItems() {
