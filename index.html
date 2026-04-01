@@ -779,11 +779,23 @@ function toggleOcrItemEdit(idx) {
   form += '</div>';
   var cAmt = item.contentAmount || "";
   var cUnit = item.contentUnit || "";
-  form += '<div class="ocr-edit-row">';
+  var CONTENT_UNITS = ["本","個","包","巻","錠","袋"];
   form += '<div class="form-group"><label class="form-label">内容量</label>';
-  form += '<input type="number" class="form-input" id="ocr-edit-camt-' + idx + '" value="' + cAmt + '" placeholder="例: 5"></div>';
-  form += '<div class="form-group"><label class="form-label">内容量の単位</label>';
-  form += '<input type="text" class="form-input" id="ocr-edit-cunit-' + idx + '" value="' + escapeHtml(cUnit) + '" placeholder="例: g, mL, 枚"></div>';
+  form += '<div style="display:flex;gap:6px;align-items:center">';
+  form += '<input type="number" class="form-input" id="ocr-edit-camt-' + idx + '" value="' + cAmt + '" placeholder="数値" style="width:80px;flex-shrink:0">';
+  form += '<div style="display:flex;gap:4px;flex-wrap:wrap;flex:1">';
+  CONTENT_UNITS.forEach(function(u) {
+    var sel = (u === cUnit) ? ' style="background:var(--primary);color:white;border-color:var(--primary)"' : '';
+    form += '<button type="button" class="chip" data-cunit-idx="' + idx + '"' + sel + ' onclick="selectContentUnit(' + idx + ',\'' + u + '\',this)">' + u + '</button>';
+  });
+  form += '</div>';
+  form += '</div>';
+  form += '<div style="margin-top:6px;display:flex;gap:6px;align-items:center">';
+  form += '<span style="font-size:11px;color:var(--gray-500);white-space:nowrap">その他:</span>';
+  var customVal = (!cUnit || CONTENT_UNITS.indexOf(cUnit) >= 0) ? '' : cUnit;
+  form += '<input type="text" class="form-input" id="ocr-edit-cunit-custom-' + idx + '" value="' + escapeHtml(customVal) + '" placeholder="g, mL, 枚, m等" style="flex:1" oninput="clearContentUnitChips(' + idx + ')">';
+  form += '</div>';
+  form += '<input type="hidden" id="ocr-edit-cunit-' + idx + '" value="' + escapeHtml(cUnit) + '">';
   form += '</div>';
   form += '<div class="ocr-edit-row-3">';
   form += '<div class="form-group"><label class="form-label">単価（円）</label>';
@@ -802,6 +814,29 @@ function toggleOcrItemEdit(idx) {
   wrap.innerHTML += form;
 }
 
+function selectContentUnit(idx, unit, el) {
+  // チップのアクティブ切替
+  document.querySelectorAll('[data-cunit-idx="' + idx + '"]').forEach(function(c) {
+    c.style.background = ''; c.style.color = ''; c.style.borderColor = '';
+  });
+  el.style.background = 'var(--primary)';
+  el.style.color = 'white';
+  el.style.borderColor = 'var(--primary)';
+  document.getElementById("ocr-edit-cunit-" + idx).value = unit;
+  // 手入力欄をクリア
+  var custom = document.getElementById("ocr-edit-cunit-custom-" + idx);
+  if (custom) custom.value = '';
+}
+
+function clearContentUnitChips(idx) {
+  // 手入力時にチップ選択を解除
+  document.querySelectorAll('[data-cunit-idx="' + idx + '"]').forEach(function(c) {
+    c.style.background = ''; c.style.color = ''; c.style.borderColor = '';
+  });
+  var custom = document.getElementById("ocr-edit-cunit-custom-" + idx);
+  document.getElementById("ocr-edit-cunit-" + idx).value = custom ? custom.value : '';
+}
+
 function confirmOcrItemEdit(idx) {
   if (!currentOcrResult || !currentOcrResult.items[idx]) return;
   var item = currentOcrResult.items[idx];
@@ -813,7 +848,8 @@ function confirmOcrItemEdit(idx) {
   item.quantity = Number(document.getElementById("ocr-edit-qty-" + idx).value) || 1;
   item.unit = document.getElementById("ocr-edit-unit-" + idx).value || "個";
   item.contentAmount = Number(document.getElementById("ocr-edit-camt-" + idx).value) || 0;
-  item.contentUnit = document.getElementById("ocr-edit-cunit-" + idx).value || "";
+  var customUnit = document.getElementById("ocr-edit-cunit-custom-" + idx);
+  item.contentUnit = (customUnit && customUnit.value) ? customUnit.value : (document.getElementById("ocr-edit-cunit-" + idx).value || "");
   item.subtotal = item.unitPrice * item.quantity;
   recalcOcrTotal();
   renderOcrResult(currentOcrResult);
