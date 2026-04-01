@@ -478,11 +478,15 @@
 <!-- 発注タブ -->
 <div id="tab-orders" class="tab-content">
   <div id="supplier-summary" class="supplier-summary"></div>
+  <div class="search-bar" style="margin-bottom:8px">
+    <input type="text" class="form-input" id="order-search-input" placeholder="商品名・発注先で検索..." oninput="searchOrders()">
+  </div>
   <div class="filter-chips" style="margin-bottom:12px">
     <div class="chip active" onclick="filterOrders('all', this)">すべて</div>
     <div class="chip" onclick="filterOrders('pending', this)">未発注</div>
     <div class="chip" onclick="filterOrders('urgent', this)">緊急</div>
     <div class="chip" onclick="filterOrders('ordered', this)">発注済</div>
+    <div class="chip" onclick="filterOrders('delivered', this)">納品済</div>
   </div>
   <div id="orders-list"></div>
   <button class="btn btn-primary" onclick="showNewOrderModal()" style="margin-top:12px">+ 新規発注依頼</button>
@@ -1131,7 +1135,10 @@ function loadOrders() {
   var params = {};
   if (orderFilter === "pending") params.status = "pending";
   if (orderFilter === "ordered") params.status = "ordered";
+  if (orderFilter === "delivered") params.status = "delivered";
   if (orderFilter === "urgent") params.urgency = "urgent";
+  var search = document.getElementById("order-search-input").value;
+  if (search) params.search = search;
 
   apiGet("orders", params).then(function(data) {
     if (!data.ok) return;
@@ -1143,6 +1150,11 @@ function loadOrders() {
     if (!data.ok) return;
     renderSupplierSummary(data.summary);
   });
+}
+
+function searchOrders() {
+  clearTimeout(window._orderSearchTimer);
+  window._orderSearchTimer = setTimeout(loadOrders, 300);
 }
 
 function renderOrders(orders) {
