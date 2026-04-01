@@ -503,11 +503,12 @@
     <div class="chip" onclick="selectHistoryPeriod(30, this)">直近30日</div>
     <div class="chip" onclick="selectHistoryPeriod(90, this)">直近90日</div>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
-    <input type="date" class="form-input" id="history-date-from" onchange="onHistoryDateChange()" style="flex:1">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+    <input type="date" class="form-input" id="history-date-from" style="flex:1">
     <span style="color:var(--gray-500)">〜</span>
-    <input type="date" class="form-input" id="history-date-to" onchange="onHistoryDateChange()" style="flex:1">
+    <input type="date" class="form-input" id="history-date-to" style="flex:1">
   </div>
+  <button class="btn btn-primary" onclick="onHistoryDateChange()" style="width:100%;margin-bottom:16px">この期間で検索</button>
   <div id="history-summary" style="font-size:13px;color:var(--gray-500);margin-bottom:12px"></div>
   <div id="history-list"></div>
 </div>
