@@ -727,6 +727,16 @@ function renderOcrResult(result) {
     html += '<span class="ocr-item-cat">' + escapeHtml(item.category || "未分類") + '</span>';
     html += '</div>';
     html += '<button class="ocr-edit-btn" onclick="event.stopPropagation();toggleOcrItemEdit(' + idx + ')">✏️</button>';
+    // 内容量行
+    var contentAmt = item.contentAmount || 0;
+    var contentUnit = item.contentUnit || "";
+    if (contentAmt > 0 && contentUnit) {
+      var perUnit = Math.round(unitPrice / contentAmt);
+      html += '<div style="width:100%;font-size:12px;color:var(--gray-700);margin-top:4px">';
+      html += '<span>' + contentAmt + contentUnit + '</span>';
+      html += '<span style="margin-left:8px;color:var(--primary);font-weight:500">(' + perUnit.toLocaleString() + '円/' + contentUnit + ')</span>';
+      html += '</div>';
+    }
     html += '<div style="width:100%;display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-top:4px">';
     html += '<span>@' + unitPrice.toLocaleString() + '円 x ' + qty + unit + '</span>';
     html += '<span style="font-size:14px;font-weight:600;color:var(--gray-900)">' + subtotal.toLocaleString() + '円</span>';
@@ -767,6 +777,14 @@ function toggleOcrItemEdit(idx) {
   form += '<div class="form-group"><label class="form-label">カテゴリ</label>';
   form += '<select class="form-select" id="ocr-edit-cat-' + idx + '">' + catOpts + '</select></div>';
   form += '</div>';
+  var cAmt = item.contentAmount || "";
+  var cUnit = item.contentUnit || "";
+  form += '<div class="ocr-edit-row">';
+  form += '<div class="form-group"><label class="form-label">内容量</label>';
+  form += '<input type="number" class="form-input" id="ocr-edit-camt-' + idx + '" value="' + cAmt + '" placeholder="例: 5"></div>';
+  form += '<div class="form-group"><label class="form-label">内容量の単位</label>';
+  form += '<input type="text" class="form-input" id="ocr-edit-cunit-' + idx + '" value="' + escapeHtml(cUnit) + '" placeholder="例: g, mL, 枚"></div>';
+  form += '</div>';
   form += '<div class="ocr-edit-row-3">';
   form += '<div class="form-group"><label class="form-label">単価（円）</label>';
   form += '<input type="number" class="form-input" id="ocr-edit-price-' + idx + '" value="' + unitPrice + '"></div>';
@@ -794,6 +812,8 @@ function confirmOcrItemEdit(idx) {
   item.price = item.unitPrice;
   item.quantity = Number(document.getElementById("ocr-edit-qty-" + idx).value) || 1;
   item.unit = document.getElementById("ocr-edit-unit-" + idx).value || "個";
+  item.contentAmount = Number(document.getElementById("ocr-edit-camt-" + idx).value) || 0;
+  item.contentUnit = document.getElementById("ocr-edit-cunit-" + idx).value || "";
   item.subtotal = item.unitPrice * item.quantity;
   recalcOcrTotal();
   renderOcrResult(currentOcrResult);
