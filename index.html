@@ -605,6 +605,22 @@ var currentOcrResult = null;
 var multiImageDataUrls = [];
 var selectedCategory = "";
 var orderFilter = "all";
+var cachedCategories = null;
+
+// === キャッシュ ===
+function saveCache(key, data) {
+  try { sessionStorage.setItem("ci_" + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
+}
+function loadCache(key) {
+  try {
+    var raw = sessionStorage.getItem("ci_" + key);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    // 5分以内のキャッシュのみ有効
+    if (Date.now() - obj.ts > 300000) return null;
+    return obj.data;
+  } catch(e) { return null; }
+}
 
 // === タブ切替 ===
 function switchTab(tab) {
@@ -895,6 +911,8 @@ function saveScannedItems() {
         if (data.updatedCount > 0) msg += (msg ? "・" : "") + "更新" + data.updatedCount + "件";
         if (!msg) msg = data.count + "件保存";
         showToast(msg);
+        // キャッシュクリア（次回表示時に最新取得）
+        try { Object.keys(sessionStorage).forEach(function(k) { if (k.indexOf("ci_items") === 0) sessionStorage.removeItem(k); }); } catch(e) {}
         resetScan();
       } else {
         showToast("保存エラー: " + data.error);
@@ -1024,14 +1042,30 @@ function loadItems() {
   if (search) params.search = search;
   if (selectedCategory) params.category = selectedCategory;
 
+  var cacheKey = "items_" + (search || "") + "_" + (selectedCategory || "");
+
+  // キャッシュがあれば即表示
+  var cached = loadCache(cacheKey);
+  if (cached) {
+    allItems = cached;
+    renderItems(cached);
+  }
+  if (cachedCategories) {
+    renderCategoryChips(cachedCategories);
+  }
+
+  // バックグラウンドで最新取得
   apiGet("items", params).then(function(data) {
     if (!data.ok) return;
     allItems = data.items;
+    saveCache(cacheKey, data.items);
     renderItems(data.items);
   });
 
   apiGet("categories").then(function(data) {
     if (!data.ok) return;
+    cachedCategories = data.categories;
+    saveCache("categories", data.categories);
     renderCategoryChips(data.categories);
   });
 }
@@ -1290,10 +1324,12 @@ function showNewOrderModal() {
   document.getElementById("order-requester").value = "";
   document.getElementById("order-memo").value = "";
   document.getElementById("order-suggestions").style.display = "none";
-  // 物品一覧を毎回取得（最新データで検索するため）
-  apiGet("items").then(function(data) {
-    if (data.ok) allItems = data.items;
-  });
+  // キャッシュがあればそのまま使用、バックグラウンドで更新
+  if (allItems.length === 0) {
+    apiGet("items").then(function(data) {
+      if (data.ok) { allItems = data.items; saveCache("items__", data.items); }
+    });
+  }
   showModal("modal-new-order");
 }
 
@@ -1373,10 +1409,22 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// 起動時に物品一覧を取得
-apiGet("items").then(function(data) {
-  if (data.ok) allItems = data.items;
-});
+// 起動時：キャッシュがあれば即セット、なければAPI取得
+var initCache = loadCache("items__");
+if (initCache) {
+  allItems = initCache;
+} else {
+  apiGet("items").then(function(data) {
+    if (data.ok) {
+      allItems = data.items;
+      saveCache("items__", data.items);
+    }
+  });
+}
+var initCatCache = loadCache("categories");
+if (initCatCache) {
+  cachedCategories = initCatCache;
+}
 
 // モーダル外タップで閉じる
 document.querySelectorAll(".modal-overlay").forEach(function(overlay) {
