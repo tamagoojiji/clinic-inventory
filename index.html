@@ -407,6 +407,7 @@
   <button class="active" onclick="switchTab('scan')">スキャン</button>
   <button onclick="switchTab('items')">物品一覧</button>
   <button onclick="switchTab('orders')">発注</button>
+  <button onclick="switchTab('history')">履歴</button>
   <button onclick="switchTab('stock')">在庫</button>
 </nav>
 
@@ -486,10 +487,29 @@
     <div class="chip" onclick="filterOrders('pending', this)">未発注</div>
     <div class="chip" onclick="filterOrders('urgent', this)">緊急</div>
     <div class="chip" onclick="filterOrders('ordered', this)">発注済</div>
-    <div class="chip" onclick="filterOrders('delivered', this)">納品済</div>
   </div>
   <div id="orders-list"></div>
   <button class="btn btn-primary" onclick="showNewOrderModal()" style="margin-top:12px">+ 新規発注依頼</button>
+</div>
+
+<!-- 履歴タブ -->
+<div id="tab-history" class="tab-content">
+  <div class="search-bar" style="margin-bottom:8px">
+    <input type="text" class="form-input" id="history-search-input" placeholder="商品名・発注先で検索..." oninput="searchHistory()">
+  </div>
+  <div class="filter-chips" style="margin-bottom:12px">
+    <div class="chip active" onclick="selectHistoryPeriod('all', this)">すべて</div>
+    <div class="chip" onclick="selectHistoryPeriod(7, this)">直近7日</div>
+    <div class="chip" onclick="selectHistoryPeriod(30, this)">直近30日</div>
+    <div class="chip" onclick="selectHistoryPeriod(90, this)">直近90日</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+    <input type="date" class="form-input" id="history-date-from" onchange="onHistoryDateChange()" style="flex:1">
+    <span style="color:var(--gray-500)">〜</span>
+    <input type="date" class="form-input" id="history-date-to" onchange="onHistoryDateChange()" style="flex:1">
+  </div>
+  <div id="history-summary" style="font-size:13px;color:var(--gray-500);margin-bottom:12px"></div>
+  <div id="history-list"></div>
 </div>
 
 <!-- 在庫タブ -->
@@ -609,6 +629,8 @@ var currentOcrResult = null;
 var multiImageDataUrls = [];
 var selectedCategory = "";
 var orderFilter = "all";
+var historyDateFrom = "";
+var historyDateTo = "";
 var cachedCategories = null;
 
 // === キャッシュ ===
@@ -636,6 +658,7 @@ function switchTab(tab) {
 
   if (tab === "items") loadItems();
   if (tab === "orders") loadOrders();
+  if (tab === "history") loadHistory();
 }
 
 // === API呼び出し ===
@@ -1288,6 +1311,89 @@ function submitOrder() {
       }
     })
     .catch(function() { showToast("通信エラー"); });
+}
+
+// === 納品履歴 ===
+function loadHistory() {
+  var params = { status: "delivered" };
+  var search = document.getElementById("history-search-input").value;
+  if (search) params.search = search;
+  if (historyDateFrom) params.dateFrom = historyDateFrom;
+  if (historyDateTo) params.dateTo = historyDateTo;
+
+  apiGet("orders", params).then(function(data) {
+    if (!data.ok) return;
+    renderHistory(data.orders);
+  });
+}
+
+function searchHistory() {
+  clearTimeout(window._historySearchTimer);
+  window._historySearchTimer = setTimeout(loadHistory, 300);
+}
+
+function selectHistoryPeriod(days, el) {
+  document.querySelectorAll("#tab-history .chip").forEach(function(c) { c.classList.remove("active"); });
+  if (el) el.classList.add("active");
+
+  if (days === "all") {
+    historyDateFrom = "";
+    historyDateTo = "";
+  } else {
+    var now = new Date();
+    var from = new Date(now.getTime() - days * 86400000);
+    historyDateFrom = formatLocalDate(from);
+    historyDateTo = formatLocalDate(now);
+  }
+  document.getElementById("history-date-from").value = historyDateFrom;
+  document.getElementById("history-date-to").value = historyDateTo;
+  loadHistory();
+}
+
+function onHistoryDateChange() {
+  historyDateFrom = document.getElementById("history-date-from").value;
+  historyDateTo = document.getElementById("history-date-to").value;
+  document.querySelectorAll("#tab-history .chip").forEach(function(c) { c.classList.remove("active"); });
+  loadHistory();
+}
+
+function formatLocalDate(d) {
+  var y = d.getFullYear();
+  var m = ("0" + (d.getMonth() + 1)).slice(-2);
+  var day = ("0" + d.getDate()).slice(-2);
+  return y + "-" + m + "-" + day;
+}
+
+function renderHistory(orders) {
+  var total = 0;
+  orders.forEach(function(o) { total += o.totalPrice || 0; });
+
+  var summaryEl = document.getElementById("history-summary");
+  summaryEl.textContent = orders.length + "件 / 合計 " + total.toLocaleString() + "円";
+
+  if (orders.length === 0) {
+    document.getElementById("history-list").innerHTML = '<div class="card" style="text-align:center;color:var(--gray-500)">納品履歴はありません</div>';
+    return;
+  }
+
+  var html = "";
+  orders.forEach(function(order) {
+    html += '<div class="order-row">';
+    html += '<div class="order-header">';
+    html += '<span class="order-name">' + escapeHtml(order.itemName) + '</span>';
+    html += '<span style="font-size:12px;color:var(--gray-500)">' + (order.orderedAt || order.requestedAt || "") + '</span>';
+    html += '</div>';
+    html += '<div class="order-detail">';
+    if (order.unitPrice > 0) html += '@' + order.unitPrice.toLocaleString() + '円 x ' + order.quantity;
+    if (order.totalPrice > 0) html += '　' + order.totalPrice.toLocaleString() + '円';
+    html += '</div>';
+    if (order.supplier) {
+      html += '<div class="order-detail">発注先: ' + escapeHtml(order.supplier) + '</div>';
+    }
+    html += '</div>';
+  });
+
+  document.getElementById("history-list").innerHTML = html;
 }
 
 // === 手動物品追加 ===
