@@ -937,6 +937,7 @@ function saveScannedItems() {
         var msg = "";
         if (data.newCount > 0) msg += "新規" + data.newCount + "件";
         if (data.updatedCount > 0) msg += (msg ? "・" : "") + "更新" + data.updatedCount + "件";
+        if (data.skippedCount > 0) msg += (msg ? "・" : "") + "登録済み" + data.skippedCount + "件";
         if (!msg) msg = data.count + "件保存";
         showToast(msg);
         // キャッシュクリア（次回表示時に最新取得）
