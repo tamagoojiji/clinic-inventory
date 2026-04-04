@@ -487,6 +487,7 @@
     <div class="chip" onclick="filterOrders('pending', this)">未発注</div>
     <div class="chip" onclick="filterOrders('urgent', this)">緊急</div>
     <div class="chip" onclick="filterOrders('ordered', this)">発注済</div>
+    <div class="chip" onclick="filterOrders('delivered', this)">受取済</div>
   </div>
   <div id="orders-list"></div>
   <button class="btn btn-primary" onclick="showNewOrderModal()" style="margin-top:12px">+ 新規発注依頼</button>
@@ -938,6 +939,7 @@ function saveScannedItems() {
         if (data.newCount > 0) msg += "新規" + data.newCount + "件";
         if (data.updatedCount > 0) msg += (msg ? "・" : "") + "更新" + data.updatedCount + "件";
         if (data.skippedCount > 0) msg += (msg ? "・" : "") + "登録済み" + data.skippedCount + "件";
+        if (data.deliveredCount > 0) msg += (msg ? "・" : "") + "発注" + data.deliveredCount + "件を受取済に";
         if (!msg) msg = data.count + "件保存";
         showToast(msg);
         // キャッシュクリア（次回表示時に最新取得）
