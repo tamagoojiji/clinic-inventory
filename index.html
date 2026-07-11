@@ -424,6 +424,11 @@
   <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="handleImageSelect(event)">
   <input type="file" id="library-input" accept="image/*" multiple style="display:none" onchange="handleMultiImageSelect(event)">
 
+  <div class="scan-area" onclick="startManualEntry()" style="padding:20px">
+    <div class="scan-icon" style="font-size:32px">✏️</div>
+    <div class="scan-text">手入力で一覧を作成</div>
+  </div>
+
   <div id="scan-preview" style="display:none">
     <img id="preview-image" class="preview-img">
     <button class="btn btn-primary" onclick="startOcr()" id="btn-ocr">読み取り開始</button>
@@ -452,11 +457,17 @@
         <span style="font-weight:600">合計</span>
         <span id="result-total" style="font-size:18px;font-weight:700"></span>
       </div>
+      <button class="btn btn-outline" onclick="addOcrItem()" style="width:100%;margin-top:8px">＋ 商品を追加</button>
     </div>
 
     <div class="form-group">
       <label class="form-label">発注先（修正可）</label>
-      <input type="text" id="edit-supplier" class="form-input" placeholder="CI、Amazon 等">
+      <input type="text" id="edit-supplier" class="form-input" placeholder="CI、Amazon 等" oninput="if(currentOcrResult)currentOcrResult.supplier=this.value">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">購入日（修正可）</label>
+      <input type="date" class="form-input" id="edit-date" oninput="if(currentOcrResult)currentOcrResult.date=this.value" onchange="if(currentOcrResult)currentOcrResult.date=this.value">
     </div>
 
     <div style="display:flex;gap:8px">
@@ -785,9 +796,42 @@ function startOcr() {
 
 var CATEGORY_OPTIONS = ["消耗品","医療材料","事務用品","薬品","検査用品","機器","衛生用品","その他"];
 
+function startManualEntry() {
+  currentOcrResult = { supplier: "", date: formatLocalDate(new Date()), total: 0, items: [] };
+  document.getElementById("scan-preview").style.display = "none";
+  document.getElementById("multi-preview").style.display = "none";
+  renderOcrResult(currentOcrResult);
+  document.getElementById("scan-result").style.display = "block";
+  addOcrItem();
+}
+
+// 開いている編集フォームを自動確定する（未確定のまま再描画されて入力が消えるのを防ぐ）
+function confirmOpenOcrEdits() {
+  var indices = [];
+  document.querySelectorAll("#result-items .ocr-item-wrap").forEach(function(w) {
+    if (w.querySelector(".ocr-edit-form")) indices.push(Number(w.id.replace("ocr-row-", "")));
+  });
+  indices.forEach(function(i) {
+    if (document.getElementById("ocr-edit-name-" + i)) confirmOcrItemEdit(i);
+  });
+}
+
+function addOcrItem() {
+  if (!currentOcrResult) return;
+  confirmOpenOcrEdits();
+  currentOcrResult.items.push({ name:"", modelNumber:"", category:"消耗品", unitPrice:0, quantity:1, unit:"個", contentAmount:0, contentUnit:"", subtotal:0 });
+  var newIdx = currentOcrResult.items.length - 1;
+  recalcOcrTotal();
+  renderOcrResult(currentOcrResult);
+  toggleOcrItemEdit(newIdx);
+  var row = document.getElementById("ocr-row-" + newIdx);
+  if (row) row.scrollIntoView({ block: "center" });
+}
+
 function renderOcrResult(result) {
   document.getElementById("result-supplier").textContent = result.supplier || "";
   document.getElementById("edit-supplier").value = result.supplier || "";
+  document.getElementById("edit-date").value = result.date || formatLocalDate(new Date());
   recalcOcrTotal();
 
   var html = "";
@@ -955,12 +999,23 @@ function recalcOcrTotal() {
 
 function saveScannedItems() {
   if (!currentOcrResult) return;
+  confirmOpenOcrEdits();
+
+  var items = currentOcrResult.items || [];
+  if (items.length === 0) {
+    showToast("商品がありません");
+    return;
+  }
+  if (items.some(function(it) { return !(it.name || "").trim(); })) {
+    showToast("商品名が未入力の行があります");
+    return;
+  }
 
   var supplier = document.getElementById("edit-supplier").value;
-  var items = currentOcrResult.items || [];
+  var editDate = document.getElementById("edit-date").value;
   var scanMeta = {
     supplier: supplier,
-    date: currentOcrResult.date,
+    date: editDate || currentOcrResult.date,
     total: currentOcrResult.total
   };
 
