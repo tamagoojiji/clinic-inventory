@@ -663,25 +663,57 @@ function switchTab(tab) {
   if (tab === "history") loadHistory();
 }
 
+// === APIトークン ===
+function getApiToken() {
+  try { return localStorage.getItem("apiToken") || ""; } catch(e) { return ""; }
+}
+function setApiToken(t) {
+  try { localStorage.setItem("apiToken", t || ""); } catch(e) {}
+}
+function promptApiToken() {
+  var t = prompt("APIトークンを入力してください");
+  if (t) { setApiToken(t); return t; }
+  return "";
+}
+// unauthorizedなら1回だけトークン入力→リトライ。再度不許可ならトーストで通知
+function handleAuthRetry(data, retryFn, retried) {
+  if (data && data.ok === false && data.error === "unauthorized") {
+    if (!retried && promptApiToken()) return retryFn();
+    showToast("APIトークンが正しくありません");
+  }
+  return data;
+}
+
 // === API呼び出し ===
-function apiGet(action, params) {
+function apiGet(action, params, _retried) {
   var url = GAS_URL + "?action=" + action;
   if (params) {
     for (var k in params) {
       if (params[k]) url += "&" + k + "=" + encodeURIComponent(params[k]);
     }
   }
-  return fetch(url, { redirect: "follow" }).then(function(r) { return r.json(); });
+  var token = getApiToken();
+  if (token) url += "&token=" + encodeURIComponent(token);
+  return fetch(url, { redirect: "follow" }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      return handleAuthRetry(data, function() { return apiGet(action, params, true); }, _retried);
+    });
 }
 
-function apiPost(body) {
+function apiPost(body, _retried) {
+  var payload = {};
+  for (var k in body) payload[k] = body[k];
+  var token = getApiToken();
+  if (token) payload.token = token;
   return fetch(GAS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(body)
+    body: JSON.stringify(payload)
   }).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
+  }).then(function(data) {
+    return handleAuthRetry(data, function() { return apiPost(body, true); }, _retried);
   });
 }
 
