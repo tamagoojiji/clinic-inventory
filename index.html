@@ -681,16 +681,21 @@ function getApiToken() {
 function setApiToken(t) {
   try { localStorage.setItem("apiToken", t || ""); } catch(e) {}
 }
-function promptApiToken() {
-  var t = prompt("APIトークンを入力してください");
+function promptApiToken(msg) {
+  var t = prompt(msg || "パスコードを入力してください");
   if (t) { setApiToken(t); return t; }
   return "";
 }
-// unauthorizedなら1回だけトークン入力→リトライ。再度不許可ならトーストで通知
+// unauthorizedなら入力→リトライ。1回入力ミスしたらヒント付きで再入力
 function handleAuthRetry(data, retryFn, retried) {
   if (data && data.ok === false && data.error === "unauthorized") {
-    if (!retried && promptApiToken()) return retryFn();
-    showToast("APIトークンが正しくありません");
+    if (!retried) {
+      if (promptApiToken()) return retryFn();
+    } else {
+      // 1回入力ミス → ヒントを表示して再入力
+      if (promptApiToken("パスコードが違います\nタブレットのパスコードと同じです")) return retryFn();
+      showToast("パスコードが正しくありません");
+    }
   }
   return data;
 }
