@@ -96,14 +96,14 @@
     .scan-area {
       background: white;
       border-radius: var(--radius);
-      padding: 40px 20px;
+      padding: 18px 16px;
       text-align: center;
       border: 2px dashed var(--gray-200);
-      margin-bottom: 16px;
+      margin-bottom: 10px;
       cursor: pointer;
     }
     .scan-area:active { background: var(--gray-100); }
-    .scan-icon { font-size: 48px; margin-bottom: 12px; }
+    .scan-icon { font-size: 30px; margin-bottom: 6px; }
     .scan-text { font-size: 14px; color: var(--gray-500); }
 
     /* プレビュー */
@@ -417,15 +417,15 @@
     <div class="scan-icon">📷</div>
     <div class="scan-text">領収書・レシートを撮影<br>タップしてカメラを起動</div>
   </div>
-  <div class="scan-area" onclick="document.getElementById('library-input').click()" style="padding:20px;border-style:solid;border-color:var(--primary);background:var(--primary-light)">
-    <div class="scan-icon" style="font-size:32px">🖼️</div>
+  <div class="scan-area" onclick="document.getElementById('library-input').click()" style="border-style:solid;border-color:var(--primary);background:var(--primary-light)">
+    <div class="scan-icon">🖼️</div>
     <div class="scan-text">ライブラリから選択（最大5枚）</div>
   </div>
   <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="handleImageSelect(event)">
   <input type="file" id="library-input" accept="image/*" multiple style="display:none" onchange="handleMultiImageSelect(event)">
 
-  <div class="scan-area" onclick="startManualEntry()" style="padding:20px">
-    <div class="scan-icon" style="font-size:32px">✏️</div>
+  <div class="scan-area" onclick="startManualEntry()">
+    <div class="scan-icon">✏️</div>
     <div class="scan-text">手入力で一覧を作成</div>
   </div>
 
